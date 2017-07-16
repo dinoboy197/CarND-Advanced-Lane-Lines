@@ -4,6 +4,7 @@ import cv2
 import glob
 import numpy as np
 import os
+from moviepy.editor import VideoFileClip
 
 def compute_calibration_mtx_and_distortion_coeff():
     # Make a list of calibration images
@@ -43,20 +44,31 @@ def correct_distortion(img, mtx, dist):
     return cv2.undistort(img, mtx, dist, None, mtx)
 
 # Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
-
+print("computing camera calibration matrix and distortion coefficients...")
 calibration_matrix, distortion_coefficients = compute_calibration_mtx_and_distortion_coeff()
 
 # Apply a distortion correction to raw test images.
 
+
+def process_image(image):
+    # Apply a distortion correction to raw images.
+    dst = correct_distortion(image, calibration_matrix, distortion_coefficients)
+    # Use color transforms, gradients, etc., to create a thresholded binary image.
+    # Apply a perspective transform to rectify binary image ("birds-eye view").
+    # Detect lane pixels and fit to find the lane boundary.
+    # Determine the curvature of the lane and vehicle position with respect to center.
+    # Warp the detected lane boundaries back onto the original image.
+    # Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
+    return dst
+
 for test_image in glob.glob(os.path.join('test_images','*.jpg')):
+    print("working on %s..." % test_image)
     img = cv2.imread(test_image)
-    dst = correct_distortion(img, calibration_matrix, distortion_coefficients)
+    dst = process_image(img)
     cv2.imwrite(os.path.join('output_images', os.path.basename(test_image)), dst)
 
-# Apply a distortion correction to raw test images.
-# Use color transforms, gradients, etc., to create a thresholded binary image.
-# Apply a perspective transform to rectify binary image ("birds-eye view").
-# Detect lane pixels and fit to find the lane boundary.
-# Determine the curvature of the lane and vehicle position with respect to center.
-# Warp the detected lane boundaries back onto the original image.
-# Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
+for file_name in glob.glob("*.mp4"):
+    print("working on %s..." % file_name)
+    video = VideoFileClip(file_name)
+    processed = video.fl_image(process_image) #NOTE: this function expects color images!!
+    processed.write_videofile(os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
