@@ -224,7 +224,7 @@ def process_image(original_image):
     final = draw_lines_on_undistorted(image, warped_binary, left_fitx, right_fitx, undistorted)
     
     # TODO - Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
-    print(left_curverad, 'm', right_curverad, 'm')
+    #print(left_curverad, 'm', right_curverad, 'm')
     
     return final
 
@@ -236,8 +236,10 @@ for test_image in glob.glob(os.path.join('test_images','*.jpg')):
     dst = process_image(img)
     cv2.imwrite(os.path.join('output_images', os.path.basename(test_image)), dst)
 
-#for file_name in glob.glob("*.mp4"):
-#    print("working on %s..." % file_name)
-#    video = VideoFileClip(file_name)
-#    processed = video.fl_image(process_image) #NOTE: this function expects color images!!
-#    processed.write_videofile(os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
+for file_name in glob.glob("*.mp4"):
+    if "_processed" in file_name:
+        continue
+    print("working on %s..." % file_name)
+    video = VideoFileClip(file_name)
+    processed = video.fl_image(process_image) #NOTE: this function expects color images!!
+    processed.write_videofile(os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
