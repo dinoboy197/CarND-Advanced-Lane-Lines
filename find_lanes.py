@@ -125,32 +125,37 @@ def fit_lane_line_polynomials(binary_warped):
     ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
 
     # Fit a second order polynomial to each
-    #left_fit = np.polyfit(lefty, leftx, 2)
-    #right_fit = np.polyfit(righty, rightx, 2)
-    left_fit = np.polyfit(lefty*ym_per_pix, leftx*xm_per_pix, 2)
-    right_fit = np.polyfit(righty*ym_per_pix, rightx*xm_per_pix, 2)
+    left_fit = np.polyfit(lefty, leftx, 2)
+    right_fit = np.polyfit(righty, rightx, 2)
     
     # Generate x and y values for plotting
     left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
     right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
-
-    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
-    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
-    plt.imshow(out_img)
-    plt.plot(left_fitx, ploty, color='yellow')
-    plt.plot(right_fitx, ploty, color='yellow')
-    plt.xlim(0, 1280)
-    plt.ylim(720, 0)
-    plt.show()
     
-    return (left_fit, left_fitx, right_fit, right_fitx)
+    # Fit new polynomials to x,y in world space for curvature calculation
+    left_fit_cr = np.polyfit(lefty*ym_per_pix, leftx*xm_per_pix, 2)
+    right_fit_cr = np.polyfit(righty*ym_per_pix, rightx*xm_per_pix, 2)
 
-def radius_of_curvature(height, left_fit, right_fit):
+    #out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+    #out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+    #plt.imshow(out_img)
+    #plt.plot(left_fitx, ploty, color='yellow')
+    #plt.plot(right_fitx, ploty, color='yellow')
+    #plt.xlim(0, 1280)
+    #plt.ylim(720, 0)
+    #plt.show()
+    
+    return (left_fit_cr, left_fitx, right_fit_cr, right_fitx)
+
+def radius_of_curvature(height, left_fit_cr, right_fit_cr):
     # Define y-value where we want radius of curvature
     # I'll choose the maximum y-value, corresponding to the bottom of the image
     y_eval = height
-    left_curverad = ((1 + (2*left_fit[0]*y_eval*ym_per_pix + left_fit[1])**2)**1.5) / np.absolute(2*left_fit[0])
-    right_curverad = ((1 + (2*right_fit[0]*y_eval*ym_per_pix + right_fit[1])**2)**1.5) / np.absolute(2*right_fit[0])
+    left_curverad = ((1 + (2*left_fit_cr[0]*y_eval + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
+    right_curverad = ((1 + (2*right_fit_cr[0]*y_eval + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
+
+    #left_curverad = ((1 + (2*left_fit[0]*y_eval*ym_per_pix + left_fit[1])**2)**1.5) / np.absolute(2*left_fit[0])
+    #right_curverad = ((1 + (2*right_fit[0]*y_eval*ym_per_pix + right_fit[1])**2)**1.5) / np.absolute(2*right_fit[0])
 
     return (left_curverad, right_curverad)
 
@@ -210,16 +215,17 @@ def process_image(original_image):
     warped_binary = cv2.warpPerspective(combined_binary, pespective_transformation_matrix, (1280,720), flags=cv2.INTER_LINEAR)
     
     # Detect lane pixels and fit to find the lane boundary.
-    left_fit, left_fitx, right_fit, right_fitx = fit_lane_line_polynomials(warped_binary)
+    left_fit_cr, left_fitx, right_fit_cr, right_fitx = fit_lane_line_polynomials(warped_binary)
     
     # Determine the curvature of the lane and vehicle position with respect to center.
-    left_curverad, right_curverad = radius_of_curvature(warped_binary.shape[0], left_fit, right_fit)
+    left_curverad, right_curverad = radius_of_curvature(warped_binary.shape[0], left_fit_cr, right_fit_cr)
 
     # Warp the detected lane boundaries back onto the original image.
     final = draw_lines_on_undistorted(image, warped_binary, left_fitx, right_fitx, undistorted)
     
     # TODO - Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
-
+    print(left_curverad, 'm', right_curverad, 'm')
+    
     return final
 
 # run image processing on test images
