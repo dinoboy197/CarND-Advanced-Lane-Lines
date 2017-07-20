@@ -51,28 +51,33 @@ def create_thresholded_binary(image):
 
     # Sobel gradient finding in x direction
     sobelx = cv2.Sobel(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).astype(np.float), cv2.CV_64F, 1, 0)
+
      # Absolute x derivative to accentuate lines away from horizontal
     abs_sobelx = np.absolute(sobelx)
     scaled_sobel = np.uint8(255*abs_sobelx/np.max(abs_sobelx))
     
     # Threshold x gradient
     sxbinary = np.zeros_like(scaled_sobel)
-    sxbinary[(scaled_sobel >= 20) & (scaled_sobel <= 100)] = 1
+    sxbinary[(scaled_sobel >= 40) & (scaled_sobel <= 100)] = 1
     
     # Threshold color channel
     s_binary = np.zeros_like(s_channel)
     s_binary[(s_channel >= 170) & (s_channel <= 255)] = 1
+    
+    # Stack each channel to view their individual contributions in green and blue respectively
+    # This returns a stack of the two binary images, whose components you can see as different colors
+    color_binary = np.dstack(( np.zeros_like(sxbinary), sxbinary, s_binary))
 
     # Combine the two binary thresholds
     combined_binary = np.zeros_like(sxbinary)
     combined_binary[(s_binary == 1) | (sxbinary == 1)] = 1
 
-    return combined_binary
+    return (combined_binary, color_binary)
 
 def compute_perspective_transform_matrices():
     # compute perspective transform based on visual inspection of matching trapezoids
     # in straight_lines1.jpg(pre and post perspective transform)
-    src_trap=np.array([[597,448], [685,448], [1039,676], [268,676]], dtype = "float32")
+    src_trap=np.array([[589,455], [692,455], [1039,676], [268,676]], dtype = "float32")
     dst_trap=np.array([[300,0], [1030,0], [980,719], [250,719]], dtype = "float32")
     return (cv2.getPerspectiveTransform(src_trap, dst_trap), cv2.getPerspectiveTransform(dst_trap, src_trap))
 
@@ -99,9 +104,9 @@ def fit_lane_line_polynomials(binary_warped):
     leftx_current = leftx_base
     rightx_current = rightx_base
     # Set the width of the windows +/- margin
-    margin = 100
+    margin = 125
     # Set minimum number of pixels found to recenter window
-    minpix = 50
+    minpix = 60
     # Create empty lists to receive left and right lane pixel indices
     left_lane_inds = []
     right_lane_inds = []
@@ -156,18 +161,66 @@ def fit_lane_line_polynomials(binary_warped):
     # Fit new polynomials to x,y in world space for curvature calculation
     left_fit_cr = np.polyfit(lefty*ym_per_pix, leftx*xm_per_pix, 2)
     right_fit_cr = np.polyfit(righty*ym_per_pix, rightx*xm_per_pix, 2)
-
-    #out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
-    #out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
-    #plt.imshow(out_img)
-    #plt.plot(left_fitx, ploty, color='yellow')
-    #plt.plot(right_fitx, ploty, color='yellow')
-    #plt.xlim(0, 1280)
-    #plt.ylim(720, 0)
-    #plt.show()
     
-    return (left_fit_cr, left_fitx, right_fit_cr, right_fitx)
+    
+    return (left_fit_cr, left_fitx, right_fit_cr, right_fitx, out_img, left_lane_inds, right_lane_inds, nonzerox, nonzeroy, ploty)
 
+from collections import deque
+
+previous_left_curve_radius = deque([])
+previous_right_curve_radius = deque([])
+previous_left_fitx = deque([])
+previous_right_fitx = deque([])
+
+def ignore_curve_outliers(left_curve_radius, right_curve_radius, left_fitx, right_fitx):
+    global previous_left_curve_radius
+    global previous_right_curve_radius
+    global previous_left_fitx
+    global previous_right_fitx
+    
+    num_items = 10
+    std_dev_limit = 1.5
+    
+    if len(previous_left_curve_radius) >= num_items:
+        previous_left_curve_radius.popleft()
+    previous_left_curve_radius.append(left_curve_radius)
+
+    if len(previous_left_fitx) >= num_items:
+        previous_left_fitx.popleft()
+    previous_left_fitx.append(left_fitx)
+    
+    # take average of curvatures which are not are more than two standard deviations away from the median
+    items = np.array(previous_left_curve_radius)
+    d = np.abs(items - np.median(items))
+    mdev = np.median(d)
+    s = d/mdev if mdev else np.array([0])
+    valid_items = items[s<std_dev_limit]
+    new_left_curve_radius = valid_items.mean()
+    
+    diff = items - new_left_curve_radius
+    new_left_fitx = previous_left_fitx[np.argmin(diff)]
+    
+    if len(previous_right_curve_radius) >= num_items:
+        previous_right_curve_radius.popleft()
+    previous_right_curve_radius.append(right_curve_radius)
+
+    if len(previous_right_fitx) >= num_items:
+        previous_right_fitx.popleft()
+    previous_right_fitx.append(right_fitx)
+    
+    # take average of curvatures which are not are more than two standard deviations away from the median
+    items = np.array(previous_right_curve_radius)
+    d = np.abs(items - np.median(items))
+    mdev = np.median(d)
+    s = d/mdev if mdev else np.array([0])
+    valid_items = items[s<std_dev_limit]
+    new_right_curve_radius = valid_items.mean()
+    
+    diff = items - new_right_curve_radius
+    new_right_fitx = previous_right_fitx[np.argmin(diff)]
+
+    return (new_left_curve_radius, new_right_curve_radius, new_left_fitx, new_right_fitx, False, False)
+    
 def radius_of_curvature(height, left_fit_cr, right_fit_cr):
     # Define y-value where we want radius of curvature
     left_curverad = ((1 + (2*left_fit_cr[0]*height + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
@@ -195,28 +248,65 @@ def draw_lines_on_undistorted(image, warped, left_fitx, right_fitx, undist):
     # Combine the result with the original image
     return cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
 
+def draw_curvature_and_vehicle_position(image, left_curvature, right_curvature, bad_left_curvature_change, bad_right_curvature_change):
+    mid = cv2.putText(image, "Estimated Radius of Curvature (l/r): %sm %sm" % (int(left_curvature), int(right_curvature)), (50, 50), cv2.FONT_HERSHEY_DUPLEX, 1, 2)
+    one = cv2.putText(mid, "Left curve:      Right curve:", (50, 100), cv2.FONT_HERSHEY_DUPLEX, 1, 2)
+    two = cv2.putText(one, "bad" if bad_left_curvature_change else "good", (230, 100), cv2.FONT_HERSHEY_DUPLEX, 1, (255,0,0) if bad_left_curvature_change else (0,255,0))
+    three = cv2.putText(two, "bad" if bad_right_curvature_change else "good", (550, 100), cv2.FONT_HERSHEY_DUPLEX, 1, (255,0,0) if bad_right_curvature_change else (0, 255,0))
+    return three
+
 def process_image(image):
     # Apply a distortion correction to raw images.
     undistorted = correct_distortion(image, calibration_matrix, distortion_coefficients)
 
+
     # Use color transforms, gradients, etc., to create a thresholded binary image.
-    thresholded_binary = create_thresholded_binary(undistorted)
+    (thresholded_binary, color_binary) = create_thresholded_binary(undistorted)
+    
+    
 
     # Apply a perspective transform to rectify binary image ("birds-eye view").
     warped_binary = cv2.warpPerspective(thresholded_binary, pespective_transformation_matrix, tuple(reversed(thresholded_binary.shape)),
         flags=cv2.INTER_LINEAR)
     
     # Detect lane pixels and fit to find the lane boundary.
-    left_fit, left_fitx, right_fit, right_fitx = fit_lane_line_polynomials(warped_binary)
+    left_fit, left_fitx, right_fit, right_fitx, out_img, left_lane_inds, right_lane_inds, nonzerox, nonzeroy, ploty  = fit_lane_line_polynomials(warped_binary)
+    
     
     # Determine the curvature of the lane and vehicle position with respect to center.
     left_curve_radius, right_curve_radius = radius_of_curvature(warped_binary.shape[0], left_fit, right_fit)
+    
+    chosen_left_curve_radius, chosen_right_curve_radius, chosen_left_fitx, chosen_right_fitx, bad_left_curvature_change, bad_right_curvature_change = ignore_curve_outliers(left_curve_radius, right_curve_radius, left_fitx, right_fitx)
 
     # Warp the detected lane boundaries back onto the original image.
-    final = draw_lines_on_undistorted(image, warped_binary, left_fitx, right_fitx, undistorted)
+    image_with_lane = draw_lines_on_undistorted(image, warped_binary, chosen_left_fitx, chosen_right_fitx, undistorted)
+    
+    if True == False:
+        plt.imshow(image_with_lane)
+        plt.show()
+         
+        out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+        out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+        plt.imshow(out_img)
+        plt.plot(left_fitx, ploty, color='yellow')
+        plt.plot(right_fitx, ploty, color='yellow')
+        plt.xlim(0, 1280)
+        plt.ylim(720, 0)
+        plt.show()
+         
+         
+        plt.imshow(thresholded_binary)
+        plt.show()
+         
+        plt.imshow(color_binary)
+        plt.show()
+         
+         
+        plt.imshow(undistorted)
+        plt.show()
     
     # Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
-    #print(left_curve_radius, 'm', right_curve_radius, 'm')
+    final = draw_curvature_and_vehicle_position(image_with_lane, chosen_left_curve_radius, chosen_right_curve_radius, bad_left_curvature_change, bad_right_curvature_change)
     
     return final
 
@@ -225,20 +315,32 @@ def process_image(image):
 print("computing camera calibration matrix, distortion coefficients, and perspective transform matrices...")
 
 # Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
-calibration_matrix, distortion_coefficients = compute_calibration_mtx_and_distortion_coeff()
+#calibration_matrix, distortion_coefficients = compute_calibration_mtx_and_distortion_coeff()
+
+import pickle
+
+#pickle.dump( calibration_matrix, open( "cm.p", "wb" ) )
+#pickle.dump( distortion_coefficients, open( "dc.p", "wb" ) )
+calibration_matrix = pickle.load( open( "cm.p", "rb" ) )
+distortion_coefficients = pickle.load( open( "dc.p", "rb" ) )
 
 # Compute perspective transform matrices
-pespective_transformation_matrix, inverse_pespective_transformation_matrix = compute_perspective_transform_matrices()
+#pespective_transformation_matrix, inverse_pespective_transformation_matrix = compute_perspective_transform_matrices()
+
+#pickle.dump( pespective_transformation_matrix, open( "pt.p", "wb" ) )
+#pickle.dump( inverse_pespective_transformation_matrix, open( "ipt.p", "wb" ) )
+pespective_transformation_matrix = pickle.load( open( "pt.p", "rb" ) )
+inverse_pespective_transformation_matrix = pickle.load( open( "ipt.p", "rb" ) )
 
 # run image processing on test images
-for test_image in glob.glob(os.path.join('test_images','*.jpg')):
-    print("Processing %s..." % test_image)
-    cv2.imwrite(os.path.join('output_images', os.path.basename(test_image)), process_image(cv2.imread(test_image)))
+#for test_image in glob.glob(os.path.join('test_images','*.jpg')):
+#    print("Processing %s..." % test_image)
+#    cv2.imwrite(os.path.join('output_images', os.path.basename(test_image)), process_image(cv2.imread(test_image)))
 
 # run image processing on test videos
-#for file_name in glob.glob("*.mp4"):
-#    if "_processed" in file_name:
-#        continue
-#    print("Processing %s..." % file_name)
-#    VideoFileClip(file_name).fl_image(process_image).write_videofile(
-#        os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
+for file_name in glob.glob("*.mp4"):
+    if "_processed" in file_name:
+        continue
+    print("Processing %s..." % file_name)
+    VideoFileClip(file_name).fl_image(process_image).write_videofile(
+        os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
