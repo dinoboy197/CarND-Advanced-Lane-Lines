@@ -86,7 +86,7 @@ ym_per_pix = 30/720 # meters per pixel in y dimension (given by input dataset au
 xm_per_pix = 3.7/700 # meters per pixel in x dimension (given by input dataset authors)
 
 # fit a single line polynomial
-def fit_lane_line_polynomial(binary_warped, nonzerox, nonzeroy, x_current, out_img):
+def fit_lane_line_polynomial(previous_fit, binary_warped, nonzerox, nonzeroy, x_current, out_img):
     
     ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
     
@@ -136,32 +136,89 @@ def fit_lane_line_polynomial(binary_warped, nonzerox, nonzeroy, x_current, out_i
     # Fit new polynomials to x,y in world space for curvature calculation
     fit_cr = np.polyfit(y*ym_per_pix, x*xm_per_pix, 2)
     
-    return (fitx, fit_cr, lane_inds)
+    return (fitx, fit, fit_cr, lane_inds)
+
+def fit_lane_line_polynomial_with_previous_fit(binary_warped, previous_fit, nonzerox, nonzeroy, out_img, window_img):
+    # Assume you now have a new warped binary image 
+    # from the next frame of video (also called "binary_warped")
+    # It's now much easier to find line pixels!
+    margin = 50
+    lane_inds = ((nonzerox > (previous_fit[0]*(nonzeroy**2) + previous_fit[1]*nonzeroy + previous_fit[2] - margin)) & (nonzerox < (previous_fit[0]*(nonzeroy**2) + previous_fit[1]*nonzeroy + previous_fit[2] + margin))) 
+
+    # extract line pixel positions
+    x = nonzerox[lane_inds]
+    y = nonzeroy[lane_inds]
+
+    if x.size == 0 or y.size == 0:
+        return (None, None, None, None)
+
+    # Fit a second order polynomial
+    fit = np.polyfit(y, x, 2)
+
+    # Generate x and y values for plotting
+    ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
+    fitx = fit[0]*ploty**2 + fit[1]*ploty + fit[2]
     
-def fit_lane_line_polynomials(binary_warped, previous_left_fit, previous_right_fit):
+    # Fit new polynomials to x,y in world space for curvature calculation
+    fit_cr = np.polyfit(y*ym_per_pix, x*xm_per_pix, 2)
+    
+    # Generate a polygon to illustrate the search window area
+    # And recast the x and y points into usable format for cv2.fillPoly()
+    line_window1 = np.array([np.transpose(np.vstack([fitx-margin, ploty]))])
+    line_window2 = np.array([np.flipud(np.transpose(np.vstack([fitx+margin, ploty])))])
+    line_pts = np.hstack((line_window1, line_window2))
+    
+    # Draw the lane onto the warped blank image
+    cv2.fillPoly(window_img, np.int_([line_pts]), (0,255, 0))
+    
+    return (fitx, fit, fit_cr, lane_inds)
+
+previous_left_fit = None
+previous_right_fit = None
+
+def fit_lane_line_polynomials(binary_warped):
+    global previous_left_fit
+    global previous_right_fit
 
     # Take a histogram of the bottom half of the image
     histogram = np.sum(binary_warped[np.int(binary_warped.shape[0]/2):,:], axis=0)
-
-    # Create an output image to draw on and  visualize the result
-    out_img = np.dstack((binary_warped, binary_warped, binary_warped))*255
-
     # Find the peak of the left and right halves of the histogram
     # These will be the starting point for the left and right lines
     midpoint = np.int(histogram.shape[0]/2)
-    
+
     # Identify the x and y positions of all nonzero pixels in the image
     nonzero = binary_warped.nonzero()
     nonzeroy = np.array(nonzero[0])
     nonzerox = np.array(nonzero[1])
     
     ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
+
+    # Create an output image to draw on and  visualize the result
+    out_img = np.dstack((binary_warped, binary_warped, binary_warped))*255
+    window_img = np.zeros_like(out_img)
     
     # create left and right lane line fits and line positions
-    left_fitx, left_fit_cr, left_lane_inds = fit_lane_line_polynomial(binary_warped, nonzerox, nonzeroy,
-        np.argmax(histogram[:midpoint]), out_img)
-    right_fitx, right_fit_cr, right_lane_inds = fit_lane_line_polynomial(binary_warped, nonzerox, nonzeroy,
-        np.argmax(histogram[midpoint:]) + midpoint, out_img)
+    left_fitx = None
+    if previous_left_fit != None:
+        left_fitx, left_fit, left_fit_cr, left_lane_inds = fit_lane_line_polynomial_with_previous_fit(binary_warped,
+            previous_left_fit, nonzerox, nonzeroy, out_img, window_img)
+    
+    if left_fitx == None:
+        left_fitx, left_fit, left_fit_cr, left_lane_inds = fit_lane_line_polynomial(previous_left_fit, binary_warped, nonzerox,
+            nonzeroy, np.argmax(histogram[:midpoint]), out_img)
+    previous_left_fit = left_fit
+
+    right_fitx = None
+    if previous_right_fit != None:
+        right_fitx, right_fit, right_fit_cr, right_lane_inds = fit_lane_line_polynomial_with_previous_fit(binary_warped,
+            previous_right_fit, nonzerox, nonzeroy, out_img, window_img)
+        
+    if right_fitx == None:
+        right_fitx, right_fit, right_fit_cr, right_lane_inds = fit_lane_line_polynomial(previous_right_fit, binary_warped, nonzerox,
+            nonzeroy, np.argmax(histogram[midpoint:]) + midpoint, out_img)
+    previous_right_fit = right_fit
+    
+    out_img = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
 
     return (left_fit_cr, left_fitx, right_fit_cr, right_fitx, out_img, left_lane_inds, right_lane_inds,
         nonzerox, nonzeroy, ploty)
@@ -172,6 +229,10 @@ previous_left_fitx = deque([])
 previous_right_fitx = deque([])
 
 def reset_measurements():
+    global previous_left_fit
+    global previous_right_fit
+    previous_left_fit = None
+    previous_right_fit = None
     previous_left_curve_radius.clear()
     previous_right_curve_radius.clear()
     previous_left_fitx.clear()
@@ -274,7 +335,7 @@ def process_image(image):
         flags=cv2.INTER_LINEAR)
     
     # Detect lane pixels and fit to find the lane boundary.
-    left_fit, left_fitx, right_fit, right_fitx, out_img, left_lane_inds, right_lane_inds, nonzerox, nonzeroy, ploty  = fit_lane_line_polynomials(warped_binary, None, None)
+    left_fit, left_fitx, right_fit, right_fitx, out_img, left_lane_inds, right_lane_inds, nonzerox, nonzeroy, ploty = fit_lane_line_polynomials(warped_binary)
 
     # Determine the curvature of the lane and vehicle position with respect to center.
     left_curve_radius, right_curve_radius = radius_of_curvature(warped_binary.shape[0], left_fit, right_fit)
