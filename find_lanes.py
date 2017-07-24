@@ -47,31 +47,58 @@ def correct_distortion(image, mtx, dist):
 
 def create_thresholded_binary(image):
     thresholded_binary = np.zeros_like(image)
-    hls = cv2.cvtColor(image, cv2.COLOR_BGR2HLS).astype(np.float)
-    s_channel = hls[:,:,2]
+    #hls = cv2.cvtColor(image, cv2.COLOR_BGR2HLS).astype(np.float)
+    #s_channel = hls[:,:,2]
+    luv = cv2.cvtColor(image, cv2.COLOR_BGR2LUV).astype(np.float)
+    l_channel = luv[:,:,0]
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2Lab).astype(np.float)
+    b_channel = lab[:,:,2]
 
     # Sobel gradient finding in x direction
     sobelx = cv2.Sobel(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).astype(np.float), cv2.CV_64F, 1, 0)
 
-     # Absolute x derivative to accentuate lines away from horizontal
+    # Threshold x gradient - detect horizontal lines
     abs_sobelx = np.absolute(sobelx)
     scaled_sobel = np.uint8(255*abs_sobelx/np.max(abs_sobelx))
-    
-    # Threshold x gradient
     sxbinary = np.zeros_like(scaled_sobel)
     sxbinary[(scaled_sobel >= 40) & (scaled_sobel <= 100)] = 1
     
-    # Threshold color channel
-    s_binary = np.zeros_like(s_channel)
-    s_binary[(s_channel >= 170) & (s_channel <= 255)] = 1
+    # Threshold L channel from LUV color space - detect white lines
+    l_binary = np.zeros_like(l_channel)
+    l_binary = np.uint8(255*l_binary/np.max(l_binary))
+    l_binary[(220 <= l_channel) & (l_channel <= 255)] = 1
+    
+    # Threshold S channel in HLS color space - detect white + yellow lines
+    #s_binary = np.zeros_like(s_channel)
+    #s_binary = np.uint8(255*s_binary/np.max(s_binary))
+    #s_binary[(s_channel >= 220) & (s_channel <= 255)] = 1
+    
+    # Threshold b channel in Lab color space - detect yellow lines
+    b_binary = np.zeros_like(b_channel)
+    b_binary = np.uint8(255*b_binary/np.max(b_binary))
+    b_binary[(0 <= b_channel) & (b_channel <= 110)] = 1
     
     # Stack each channel to view their individual contributions in green and blue respectively
     # This returns a stack of the two binary images, whose components you can see as different colors
-    color_binary = np.dstack(( np.zeros_like(sxbinary), sxbinary, s_binary))
+    color_binary = np.dstack(( np.zeros_like(sxbinary), sxbinary, np.zeros_like(sxbinary)))
+    #plt.imshow(l_channel, cmap='gray')
+    #plt.show()
+    #plt.imshow(l_binary, cmap='gray')
+    #plt.show()
+    
+    #plt.imshow(s_channel, cmap='gray')
+    #plt.show()
+    #plt.imshow(s_binary, cmap='gray')
+    #plt.show()
+    
+    #plt.imshow(b_channel, cmap='gray')
+    #plt.show()
+    #plt.imshow(b_binary, cmap='gray')
+    #plt.show()
 
     # Combine the two binary thresholds
     combined_binary = np.zeros_like(sxbinary)
-    combined_binary[(s_binary == 1) | (sxbinary == 1)] = 1
+    combined_binary[(sxbinary == 1) | (l_binary == 1) | (b_binary == 1)] = 1
 
     return (combined_binary, color_binary)
 
@@ -329,7 +356,7 @@ def process_image(image):
 
     # Use color transforms, gradients, etc., to create a thresholded binary image.
     (thresholded_binary, color_binary) = create_thresholded_binary(undistorted)
-    
+
     # Apply a perspective transform to rectify binary image ("birds-eye view").
     warped_binary = cv2.warpPerspective(thresholded_binary, pespective_transformation_matrix, tuple(reversed(thresholded_binary.shape)),
         flags=cv2.INTER_LINEAR)
@@ -344,28 +371,32 @@ def process_image(image):
 
     # Warp the detected lane boundaries back onto the original image.
     image_with_lane = draw_lines_on_undistorted(image, warped_binary, chosen_left_fitx, chosen_right_fitx, undistorted)
-    
+
     if True == False:
+        plt.figure(figsize=(20,10))
         plt.imshow(image_with_lane)
         plt.show()
          
         out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
         out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+        plt.figure(figsize=(20,10))
         plt.imshow(out_img)
         plt.plot(left_fitx, ploty, color='yellow')
         plt.plot(right_fitx, ploty, color='yellow')
         plt.xlim(0, 1280)
         plt.ylim(720, 0)
         plt.show()
-         
-         
+
+        plt.figure(figsize=(20,10))
         plt.imshow(thresholded_binary)
         plt.show()
          
+        plt.figure(figsize=(20,10))
         plt.imshow(color_binary)
         plt.show()
          
          
+        plt.figure(figsize=(20,10))
         plt.imshow(undistorted)
         plt.show()
     
@@ -388,7 +419,7 @@ pespective_transformation_matrix, inverse_pespective_transformation_matrix = com
 for test_image in glob.glob(os.path.join('test_images','*.jpg')):
     print("Processing %s..." % test_image)
     reset_measurements()
-    cv2.imwrite(os.path.join('output_images', os.path.basename(test_image)), process_image(cv2.imread(test_image)))
+    cv2.imwrite(os.path.join('output_images', os.path.basename(test_image)), cv2.cvtColor(process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR)), cv2.COLOR_BGR2RGB))
 
 # run image processing on test videos
 for file_name in glob.glob("*.mp4"):
