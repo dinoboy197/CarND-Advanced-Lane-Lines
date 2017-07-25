@@ -20,7 +20,6 @@ The goals / steps of this project are the following:
 [polynomial_fit]: ./examples/polynomial_fit.png "Fit Visual"
 [polynomial_fit_limited]: ./examples/polynomial_fit_limited.png "Fit Visual"
 [final_lane]: ./examples/final_lane.png "Output"
-[video1]: ./project_video.mp4 "Video" 
 
 ---
 
@@ -28,7 +27,7 @@ The goals / steps of this project are the following:
 
 #### 1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
 
-The code for camera matrix and distorion coefficients computation is in the method [`compute_calibration_mtx_and_distortion_coeff()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L21-L52).
+The code for camera matrix and distorion coefficients computation is in the method [`compute_calibration_mtx_and_distortion_coeff()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L24-L70).
 
 This method starts by preparing "object points", which will be the (x, y, z) coordinates of the chessboard corners in the world. Here I am assuming the chessboard is fixed on the (x, y) plane at z=0, such that the object points are the same for each calibration image. Thus, `objp` is just a replicated array of coordinates, and `objpoints` will be appended with a copy of it every time I successfully detect all chessboard corners in a test image. `img_points` will be appended with the (x, y) pixel position of each of the corners in the image plane with each successful chessboard detection.
 
@@ -36,7 +35,7 @@ Next, each chessboard calibration image is looped over. Each image is converted 
 
 Finally, the image points and object points are used to compute the camera calibration and distortion coefficients using the `cv2.calibrateCamera()` method.
 
-I applied this distortion correction to the test image using `cv2.undistort()` in the [`correct_distortion()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L55-L56) method and obtained this result:
+I applied this distortion correction to the test image using `cv2.undistort()` in the [`correct_distortion()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L73-L75) method and obtained this result:
 
 ![alt text][undistorted_chessboard]
 
@@ -49,7 +48,7 @@ The distortion correction method `correct_distortion()` is used on a road image,
 
 #### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
-To create a thresholded binary image, I created a method called [`create_thresholded_binary()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L58-L90). This method detects horizontal line segments through a Sobel x gradient computation, white lines through a identifying high signal in the L channel of the LUV color space, and yellow lines through identifying low (yellow) signal in the B channel of the LAB color space. Any pixel identified by any of the three filters contributes to the binary image.
+To create a thresholded binary image, I created a method called [`create_thresholded_binary()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L78-L113). This method detects horizontal line segments through a Sobel x gradient computation, white lines through a identifying high signal in the L channel of the LUV color space, and yellow lines through identifying low (yellow) signal in the B channel of the LAB color space. Any pixel identified by any of the three filters contributes to the binary image.
 
 Here is an example of an original image and a thresholded binary created from it:
 
@@ -59,7 +58,7 @@ Note that the thresholding detection picks up many other pixels that are not par
 
 #### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
-I compute a perspective transform in the method [`compute_perspective_transform_matrices()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L92-L97). This method uses a hardcoded trapezoid and rectangle determined by observation in the original unwarped image.
+I compute a perspective transform in the method [`compute_perspective_transform_matrices()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L116-L123). This method uses a hardcoded trapezoid and rectangle determined by observation in the original unwarped image.
 
 This resulted in the following source and destination points:
 
@@ -76,15 +75,15 @@ I verified that my perspective transform was working as expected by viewing the 
 
 #### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
-I used two methods of identifying lane lines in a thresholded binary image and fitting with a polynomial. The first method identifies pixels by a naive sliding window detection algorithm; the second method identifies pixels by starting with a previous line fit as a starting point. Both methods use common code in [`fit_lane_line_polynomials()`](fit_lane_line_polynomials) to pick the method to use, and fall back to naive sliding window search if the previous line fit does not perform.
+I used two methods of identifying lane lines in a thresholded binary image and fitting with a polynomial. The first method identifies pixels by a naive sliding window detection algorithm; the second method identifies pixels by starting with a previous line fit as a starting point. Both methods use common code in [`fit_lane_line_polynomials()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L221-L272) to pick the method to use, and fall back to naive sliding window search if the previous line fit does not perform.
 
-In the first method, [`fit_lane_line_polynomial()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L100-L150), the thresholded binary image is scanned on nine individual horizontal slices of the image. Slices start at the bottom and move up, selecting from the nearest to farthest point on the road. In each slice, a box starts at the horizontal location with the most highlighted pixels, and moves to the left or right at each step "up" the image based where most of the highlighted pixels in the box are detected, with some constraints on how far to the right the image can move and how big the windows are. Any pixels caught in each sliding window are used for a 2nd degree polynomial curve fit. This method is performed twice for each image, to attempt to capture both left and right lanes.
+In the first method, [`fit_lane_line_polynomial()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L126-L180), the thresholded binary image is scanned on nine individual horizontal slices of the image. Slices start at the bottom and move up, selecting from the nearest to farthest point on the road. In each slice, a box starts at the horizontal location with the most highlighted pixels, and moves to the left or right at each step "up" the image based where most of the highlighted pixels in the box are detected, with some constraints on how far to the right the image can move and how big the windows are. Any pixels caught in each sliding window are used for a 2nd degree polynomial curve fit. This method is performed twice for each image, to attempt to capture both left and right lanes.
 
 Here is an example of a thresholded binary with sliding windows and polynomial fit lines drawn over:
 
 ![alt text][polynomial_fit]
 
-In the second method, [`fit_lane_line_polynomial_with_previous_fit()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L153-L185), two previous polynomial fit lines are used (likely taken from a previous frame of video) to generate a "channel" around the line with a given margin. Only highlighted pixels in the "channel" around the line are used for the next fit line. This method can ignore more noise that the first method would be subject to; this can come in particularly useful in areas of shadow or many yellow or white areas in the image that are not lane lines. This method can also fail if no pixels are detected in the "channel" around the previous line.
+In the second method, [`fit_lane_line_polynomial_with_previous_fit()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L183-L218), two previous polynomial fit lines are used (likely taken from a previous frame of video) to generate a "channel" around the line with a given margin. Only highlighted pixels in the "channel" around the line are used for the next fit line. This method can ignore more noise that the first method would be subject to; this can come in particularly useful in areas of shadow or many yellow or white areas in the image that are not lane lines. This method can also fail if no pixels are detected in the "channel" around the previous line.
 
 Here is an example of a thresholded binary with previous fit channels and polynomial fit lines drawn over:
 
@@ -92,7 +91,7 @@ Here is an example of a thresholded binary with previous fit channels and polyno
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-Radius of curvature computation my program is intertwined with curve and lane line detection smoothing, which occurs in the methods [`determine_curve_radius_and_lane_points()`](determine_curve_radius_and_lane_points) and [`radius_of_curvature()`](radius_of_curvature).
+Radius of curvature computation my program is intertwined with curve and lane line detection smoothing, which occurs in the methods [`determine_curve_radius_and_lane_points()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L287-L347) and [`radius_of_curvature()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L350-L357).
 
 In the first method, the radius of curvature is determined by computing [the radius of curvature equation](http://www.intmath.com/applications-differentiation/8-radius-curvature.php) (straightforward algebra).
 
