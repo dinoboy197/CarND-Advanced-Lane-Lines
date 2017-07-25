@@ -1,9 +1,3 @@
-## Writeup Template
-
-### You can use this file as a template for your writeup if you want to submit it as a markdown file, but feel free to use some other method and submit a pdf if you prefer.
-
----
-
 **Advanced Lane Finding Project**
 
 The goals / steps of this project are the following:
@@ -19,96 +13,96 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 
-[image1]: ./examples/undistort_output.png "Undistorted"
-[image2]: ./test_images/test1.jpg "Road Transformed"
-[image3]: ./examples/binary_combo_example.jpg "Binary Example"
-[image4]: ./examples/warped_straight_lines.jpg "Warp Example"
-[image5]: ./examples/color_fit_lines.jpg "Fit Visual"
-[image6]: ./examples/example_output.jpg "Output"
-[video1]: ./project_video.mp4 "Video"
-
-## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
-
-### Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
+[undistorted_chessboard]: ./examples/undistorted_chessboard.png "Undistorted"
+[undistorted_road]: ./examples/undistorted_road.png "Road Undistorted"
+[thresholded_binary]: ./examples/thresholded_binary.png "Binary Example"
+[warped_road]: ./examples/warped_road.png "Warp Example"
+[polynomial_fit]: ./examples/polynomial_fit.png "Fit Visual"
+[polynomial_fit_limited]: ./examples/polynomial_fit_limited.png "Fit Visual"
+[final_lane]: ./examples/final_lane.png "Output"
+[video1]: ./project_video.mp4 "Video" 
 
 ---
-
-### Writeup / README
-
-#### 1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.  You can submit your writeup as markdown or pdf.  [Here](https://github.com/udacity/CarND-Advanced-Lane-Lines/blob/master/writeup_template.md) is a template writeup for this project you can use as a guide and a starting point.  
-
-You're reading it!
 
 ### Camera Calibration
 
 #### 1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
 
-The code for this step is contained in the first code cell of the IPython notebook located in "./examples/example.ipynb" (or in lines # through # of the file called `some_file.py`).  
+The code for camera matrix and distorion coefficients computation is in the method [`compute_calibration_mtx_and_distortion_coeff()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L21-L52).
 
-I start by preparing "object points", which will be the (x, y, z) coordinates of the chessboard corners in the world. Here I am assuming the chessboard is fixed on the (x, y) plane at z=0, such that the object points are the same for each calibration image.  Thus, `objp` is just a replicated array of coordinates, and `objpoints` will be appended with a copy of it every time I successfully detect all chessboard corners in a test image.  `imgpoints` will be appended with the (x, y) pixel position of each of the corners in the image plane with each successful chessboard detection.  
+This method starts by preparing "object points", which will be the (x, y, z) coordinates of the chessboard corners in the world. Here I am assuming the chessboard is fixed on the (x, y) plane at z=0, such that the object points are the same for each calibration image. Thus, `objp` is just a replicated array of coordinates, and `objpoints` will be appended with a copy of it every time I successfully detect all chessboard corners in a test image. `img_points` will be appended with the (x, y) pixel position of each of the corners in the image plane with each successful chessboard detection.
 
-I then used the output `objpoints` and `imgpoints` to compute the camera calibration and distortion coefficients using the `cv2.calibrateCamera()` function.  I applied this distortion correction to the test image using the `cv2.undistort()` function and obtained this result: 
+Next, each chessboard calibration image is looped over. Each image is converted to grayscale, then `cv2.findChessboardCorners` is used to detect the corners. Corners detected are made more accurate by using `cv2.cornerSubPix` with a suitable search termination criteria, then the object points and image points are added for later calibration.
 
-![alt text][image1]
+Finally, the image points and object points are used to compute the camera calibration and distortion coefficients using the `cv2.calibrateCamera()` method.
+
+I applied this distortion correction to the test image using `cv2.undistort()` in the [`correct_distortion()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L55-L56) method and obtained this result:
+
+![alt text][undistorted_chessboard]
 
 ### Pipeline (single images)
 
 #### 1. Provide an example of a distortion-corrected image.
 
-To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
-![alt text][image2]
+The distortion correction method `correct_distortion()` is used on a road image, as can be seen in this before and after image:
+![alt text][undistorted_road]
 
 #### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
-I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines # through # in `another_file.py`).  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
+To create a thresholded binary image, I created a method called [`create_thresholded_binary()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L58-L90). This method detects horizontal line segments through a Sobel x gradient computation, white lines through a identifying high signal in the L channel of the LUV color space, and yellow lines through identifying low (yellow) signal in the B channel of the LAB color space. Any pixel identified by any of the three filters contributes to the binary image.
 
-![alt text][image3]
+Here is an example of an original image and a thresholded binary created from it:
+
+![alt text][thresholded_binary]
+
+Note that the thresholding detection picks up many other pixels that are not part of the yellow or white lane lines, though the selected pixel density in the lanes are significantly greater than the overall noise in the thresholded binary image so as to not confuse the lane line detection in a future step.
 
 #### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
-The code for my perspective transform includes a function called `warper()`, which appears in lines 1 through 8 in the file `example.py` (output_images/examples/example.py) (or, for example, in the 3rd code cell of the IPython notebook).  The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose the hardcode the source and destination points in the following manner:
-
-```python
-src = np.float32(
-    [[(img_size[0] / 2) - 55, img_size[1] / 2 + 100],
-    [((img_size[0] / 6) - 10), img_size[1]],
-    [(img_size[0] * 5 / 6) + 60, img_size[1]],
-    [(img_size[0] / 2 + 55), img_size[1] / 2 + 100]])
-dst = np.float32(
-    [[(img_size[0] / 4), 0],
-    [(img_size[0] / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), 0]])
-```
+I compute a perspective transform in the method [`compute_perspective_transform_matrices()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L92-L97). This method uses a hardcoded trapezoid and rectangle determined by observation in the original unwarped image.
 
 This resulted in the following source and destination points:
 
-| Source        | Destination   | 
-|:-------------:|:-------------:| 
-| 585, 460      | 320, 0        | 
-| 203, 720      | 320, 720      |
-| 1127, 720     | 960, 720      |
-| 695, 460      | 960, 0        |
+| Source        | Destination   |
+|:-------------:|:-------------:|
+| 589, 455      | 300, 0        |
+| 692, 455      | 1030, 0       |
+| 1039, 676     | 980, 719      |
+| 268, 676      | 250, 719      |
 
-I verified that my perspective transform was working as expected by drawing the `src` and `dst` points onto a test image and its warped counterpart to verify that the lines appear parallel in the warped image.
+I verified that my perspective transform was working as expected by viewing the pre and post-transformed images:
 
-![alt text][image4]
+![alt text][warped_road]
 
 #### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
-Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this:
+I used two methods of identifying lane lines in a thresholded binary image and fitting with a polynomial. The first method identifies pixels by a naive sliding window detection algorithm; the second method identifies pixels by starting with a previous line fit as a starting point. Both methods use common code in [`fit_lane_line_polynomials()`](fit_lane_line_polynomials) to pick the method to use, and fall back to naive sliding window search if the previous line fit does not perform.
 
-![alt text][image5]
+In the first method, [`fit_lane_line_polynomial()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L100-L150), the thresholded binary image is scanned on nine individual horizontal slices of the image. Slices start at the bottom and move up, selecting from the nearest to farthest point on the road. In each slice, a box starts at the horizontal location with the most highlighted pixels, and moves to the left or right at each step "up" the image based where most of the highlighted pixels in the box are detected, with some constraints on how far to the right the image can move and how big the windows are. Any pixels caught in each sliding window are used for a 2nd degree polynomial curve fit. This method is performed twice for each image, to attempt to capture both left and right lanes.
+
+Here is an example of a thresholded binary with sliding windows and polynomial fit lines drawn over:
+
+![alt text][polynomial_fit]
+
+In the second method, [`fit_lane_line_polynomial_with_previous_fit()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L153-L185), two previous polynomial fit lines are used (likely taken from a previous frame of video) to generate a "channel" around the line with a given margin. Only highlighted pixels in the "channel" around the line are used for the next fit line. This method can ignore more noise that the first method would be subject to; this can come in particularly useful in areas of shadow or many yellow or white areas in the image that are not lane lines. This method can also fail if no pixels are detected in the "channel" around the previous line.
+
+Here is an example of a thresholded binary with previous fit channels and polynomial fit lines drawn over:
+
+![alt text][polynomial_fit_limited]
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-I did this in lines # through # in my code in `my_other_file.py`
+Radius of curvature computation my program is intertwined with curve and lane line detection smoothing, which occurs in the methods [`determine_curve_radius_and_lane_points()`](determine_curve_radius_and_lane_points) and [`radius_of_curvature()`](radius_of_curvature).
+
+In the first method, the radius of curvature is determined by computing [the radius of curvature equation](http://www.intmath.com/applications-differentiation/8-radius-curvature.php) (straightforward algebra).
+
+In the second method (which provides a small degree of curvature and lane smoothing from video frame to frame), the raw lane lines detected in the previous step are combined with the lane lines found in the previous ten frames of video. Lane lines whose curvatures are more than 1.5 standard deviations from the median are ignored, and the remaining curvatures are averaged. The lane lines with the curvature closest to the average are selected for both drawing onto the final image, as well as for the chosen curvature.
 
 #### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
-I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
+After the lane line is chosen by the smoothing algorithm above, the lane line pixels are drawn back onto the image, resulting in this:
 
-![alt text][image6]
+![alt text][final_lane]
 
 ---
 
@@ -116,7 +110,10 @@ I implemented this step in lines # through # in my code in `yet_another_file.py`
 
 #### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
-Here's a [link to my video result](./project_video.mp4)
+My lane detection algorithm was run on three videos:
+* [Project video](project_video_processed.mp4) - lane finding is quite robust, having some slight wobbles when the vehicle bounces across road surface changes and when shadows appear in the roadway
+* [Challenge video](challenge_video_processed) - lane finding is useful throughout the entire video, though the lane detection algorithm selects a shadow edge rather than the yellow lane line for a portion of the video
+* [Harder challenge video](harder_challenge_video_processed) - lane finding is primitive, staying with the lane for only a small portion of the time.
 
 ---
 
@@ -124,4 +121,4 @@ Here's a [link to my video result](./project_video.mp4)
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+ 

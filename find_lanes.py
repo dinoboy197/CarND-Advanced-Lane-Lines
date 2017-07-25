@@ -46,8 +46,17 @@ def compute_calibration_mtx_and_distortion_coeff():
             cv2.cornerSubPix(gray, corners, (11,11), (-1,-1), corner_finding_termination_criteria)
             obj_points.append(objp)
             img_points.append(corners)
-   
+
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(obj_points, img_points, gray.shape[::-1], None, None)
+
+    if debug_image == True:
+        f, (ax1, ax2) = plt.subplots(1, 2, sharey=True, figsize=(20, 10))
+        ax1.imshow(cv2.cvtColor(cv2.imread("camera_cal/calibration4.jpg"), cv2.COLOR_BGR2GRAY), cmap='gray')
+        ax1.set_title('Distorted chessboard')
+        ax2.imshow(correct_distortion(cv2.cvtColor(cv2.imread("camera_cal/calibration4.jpg"), cv2.COLOR_BGR2GRAY),
+            mtx, dist), cmap='gray')
+        ax2.set_title('Undistorted chessboard')
+        plt.show()
 
     return (mtx, dist)
 
@@ -343,23 +352,35 @@ def process_image(image):
     # Apply a distortion correction to raw images.
     undistorted = correct_distortion(image, calibration_matrix, distortion_coefficients)
     if debug_image == True:
-        plt.figure(figsize=(20,10))
-        plt.imshow(undistorted)
+        f, (ax1, ax2) = plt.subplots(1, 2, sharey=True, figsize=(20, 10))
+        ax1.imshow(image)
+        ax1.set_title("Distorted road image")
+        ax2.imshow(undistorted)
+        ax2.set_title("Undistorted road image")
         plt.show()
 
     # Use color transforms, gradients, etc., to create a thresholded binary image.
     (thresholded_binary, color_binary) = create_thresholded_binary(undistorted)
     if debug_image == True:
-        plt.figure(figsize=(20,10))
-        plt.imshow(color_binary)
-        plt.show()
-        plt.figure(figsize=(20,10))
-        plt.imshow(thresholded_binary)
+        f, (ax1, ax2) = plt.subplots(1, 2, sharey=True, figsize=(20, 10))
+        ax1.imshow(undistorted)
+        ax1.set_title("Road image")
+        ax2.imshow(thresholded_binary)
+        ax2.set_title("Thresholded binary")
         plt.show()
 
     # Apply a perspective transform to rectify binary image ("birds-eye view").
     warped_binary = cv2.warpPerspective(thresholded_binary, pespective_transformation_matrix, tuple(reversed(thresholded_binary.shape)),
         flags=cv2.INTER_LINEAR)
+    
+    if debug_image == True:
+        f, (ax1, ax2) = plt.subplots(1, 2, sharey=True, figsize=(20, 10))
+        ax1.imshow(undistorted)
+        ax1.set_title("Original image")
+        ax2.imshow(cv2.warpPerspective(undistorted, pespective_transformation_matrix, tuple(reversed(thresholded_binary.shape)),
+            flags=cv2.INTER_LINEAR))
+        ax2.set_title("Warped image")
+        plt.show()
     
     # Detect lane pixels and fit to find the lane boundary.
     left_fit, left_fitx, right_fit, right_fitx, out_img, left_lane_inds, right_lane_inds, nonzerox, nonzeroy, ploty = fit_lane_line_polynomials(warped_binary)
@@ -381,13 +402,14 @@ def process_image(image):
 
     # Warp the detected lane boundaries back onto the original image.
     image_with_lane = draw_lines_on_undistorted(image, warped_binary, chosen_left_fitx, chosen_right_fitx, undistorted)
-    if debug_image == True:
-        plt.figure(figsize=(20,10))
-        plt.imshow(image_with_lane)
-        plt.show()
 
     # Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
     final = draw_curvature_and_vehicle_position(image_with_lane, curve_radius, lane_position)
+    
+    if debug_image == True:
+        plt.figure(figsize=(20,10))
+        plt.imshow(final)
+        plt.show()
     
     return final
 
