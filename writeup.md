@@ -111,8 +111,8 @@ After the lane line is chosen by the smoothing algorithm above, the lane line pi
 
 My lane detection algorithm was run on three videos:
 * [Project video](project_video_processed.mp4) - lane finding is quite robust, having some slight wobbles when the vehicle bounces across road surface changes and when shadows appear in the roadway
-* [Challenge video](challenge_video_processed) - lane finding is useful throughout the entire video, though the lane detection algorithm selects a shadow edge rather than the yellow lane line for a portion of the video
-* [Harder challenge video](harder_challenge_video_processed) - lane finding is primitive, staying with the lane for only a small portion of the time.
+* [Challenge video](challenge_video_processed.mp4) - lane finding is useful throughout the entire video, though the lane detection algorithm selects a shadow edge rather than the yellow lane line for a portion of the video
+* [Harder challenge video](harder_challenge_video_processed.mp4) - lane finding is primitive, staying with the lane for only a small portion of the time.
 
 ---
 
