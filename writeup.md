@@ -77,13 +77,13 @@ I verified that my perspective transform was working as expected by viewing the 
 
 I used two methods of identifying lane lines in a thresholded binary image and fitting with a polynomial. The first method identifies pixels by a naive sliding window detection algorithm; the second method identifies pixels by starting with a previous line fit as a starting point. Both methods use common code in [`fit_lane_line_polynomials()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L221-L272) to pick the method to use, and fall back to naive sliding window search if the previous line fit does not perform.
 
-In the first method, [`fit_lane_line_polynomial()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L126-L180), the thresholded binary image is scanned on nine individual horizontal slices of the image. Slices start at the bottom and move up, selecting from the nearest to farthest point on the road. In each slice, a box starts at the horizontal location with the most highlighted pixels, and moves to the left or right at each step "up" the image based where most of the highlighted pixels in the box are detected, with some constraints on how far to the right the image can move and how big the windows are. Any pixels caught in each sliding window are used for a 2nd degree polynomial curve fit. This method is performed twice for each image, to attempt to capture both left and right lanes.
+In the first method, [`fit_lane_line_polynomial()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L126-L180), the thresholded binary image is scanned on nine individual horizontal slices of the image. Slices start at the bottom and move up, selecting from the nearest to farthest point on the road. In each slice, a box starts at the horizontal location with the most highlighted pixels, and moves to the left or right at each step "up" the image based where most of the highlighted pixels in the box are detected, with some constraints on how far to the left or right the image can move and how big the windows are. Any pixels caught in each sliding window are used for a 2nd degree polynomial curve fit. This method is performed twice for each image, to attempt to capture both left and right lanes.
 
 Here is an example of a thresholded binary with sliding windows and polynomial fit lines drawn over:
 
 ![alt text][polynomial_fit]
 
-In the second method, [`fit_lane_line_polynomial_with_previous_fit()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L183-L218), two previous polynomial fit lines are used (likely taken from a previous frame of video) to generate a "channel" around the line with a given margin. Only highlighted pixels in the "channel" around the line are used for the next fit line. This method can ignore more noise that the first method would be subject to; this can come in particularly useful in areas of shadow or many yellow or white areas in the image that are not lane lines. This method can also fail if no pixels are detected in the "channel" around the previous line.
+In the second method, [`fit_lane_line_polynomial_with_previous_fit()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L183-L218), two previous polynomial fit lines are used (likely taken from a previous frame of video) to generate a "channel" around the line with a given margin. Only highlighted pixels in the "channel" around the line are used for the next fit line. This method can ignore more noise than first method; this comes in particularly useful in areas of shadow or many yellow or white areas in the image that are not lane lines. This method can also fail if no pixels are detected in the "channel" around the previous line.
 
 Here is an example of a thresholded binary with previous fit channels and polynomial fit lines drawn over:
 
@@ -126,11 +126,11 @@ One of the biggest issues in the project is non-lane line pixel detection in the
 
 Another big issue is that the lane line detection algorithms are not sufficiently robust to ignore this noise at all times. The naive sliding window algorithm, in particular, is sensitive to blocks of noise in the vicinity of actual lane lines, which shows up in the project videos in locations where large shadows intersect with lane lines. The polynomial fit restricted lane line detection algorithm can ignore most of this noise, but if the lane line detection sways from the true line, recovery to the true line may take many frames.
 
-Fixing these problems required tuning of the thresholded binary pixel detection and a substantial investment in lane line detection smoothing and outlier detection. However, because bad input data often leads to bad output, more time should be spent on improving noise reduction in the thresholded binary image before further tuning downstream.
+Fixing these problems required tuning of the thresholded binary pixel detection and a substantial investment in lane line detection smoothing and outlier detection. However, because generally bad input data often leads to bad output, more time should be spent on improving noise reduction in the thresholded binary image before further tuning downstream.
 
 **Likely failure scenarios**
 
-It is already clear in the videos presented that the pipeline has occasional failures when lane lines can't be clearly detected due to shadows cast. Other likely problem triggers include:
+It is already clear in the videos presented that the pipeline has occasional failures when lane lines cannot be clearly detected due to shadows cast. Other likely problem triggers include:
 
 * Lanes not being painted clearly / faded / missing
 * Vehicle decides to drive offroad and ignore lanes
@@ -141,9 +141,9 @@ It is already clear in the videos presented that the pipeline has occasional fai
 Future modifications to increase the robustness of the lane detection might include:
 
 * Improving upon naive line detection algorithm to help eliminate effect of noise
- * Look for other lane colors
- * Use multiple steps in lane line pixel detection to use detectors with highest specificity first, then fall back to those with lower specificity if lane lines cannot be determine from initial thresholded binary
+  * Look for other lane colors
+  * Use multiple steps in lane line pixel detection to use detectors with highest specificity first, then fall back to those with lower specificity if lane lines cannot be determine from initial thresholded binary
 * Improving upon smoothing algorithm
- * Use concept of ["keyframing" from video compression](https://en.wikipedia.org/wiki/Key_frame#Video_compression) technology to periodically revert back to naive line detection, even if polynomial fit line detection has detected a line, in case it is tracking a bad line segment
+  * Use concept of ["keyframing" from video compression](https://en.wikipedia.org/wiki/Key_frame#Video_compression) technology to periodically revert back to naive line detection, even if polynomial fit line detection has detected a line, in case it is tracking a bad line segment
 
  
