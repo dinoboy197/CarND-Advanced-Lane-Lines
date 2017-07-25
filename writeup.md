@@ -120,4 +120,30 @@ My lane detection algorithm was run on three videos:
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
+**Problems / Issues**
+
+One of the biggest issues in the project is non-lane line pixel detection in the thresholded binary image creator. Because of the simple nature of having channel thresholding in color spaces be the determiner of what pixels are likely part of lane lines, groups of errant pixels ("noise") were occassionally added to the thresholded binary image which were not part of the lane lines.
+
+Another big issue is that the lane line detection algorithms are not sufficiently robust to ignore this noise at all times. The naive sliding window algorithm, in particular, is sensitive to blocks of noise in the vicinity of actual lane lines, which shows up in the project videos in locations where large shadows intersect with lane lines. The polynomial fit restricted lane line detection algorithm can ignore most of this noise, but if the lane line detection sways from the true line, recovery to the true line may take many frames.
+
+Fixing these problems required tuning of the thresholded binary pixel detection and a substantial investment in lane line detection smoothing and outlier detection. However, because bad input data often leads to bad output, more time should be spent on improving noise reduction in the thresholded binary image before further tuning downstream.
+
+**Likely failure scenarios**
+
+It is already clear in the videos presented that the pipeline has occasional failures when lane lines can't be clearly detected due to shadows cast. Other likely problem triggers include:
+
+* Lanes not being painted clearly / faded / missing
+* Vehicle decides to drive offroad and ignore lanes
+* Vehicle drives in an area without yellow or while lanes
+
+**Future improvements**
+
+Future modifications to increase the robustness of the lane detection might include:
+
+* Improving upon naive line detection algorithm to help eliminate effect of noise
+ * Look for other lane colors
+ * Use multiple steps in lane line pixel detection to use detectors with highest specificity first, then fall back to those with lower specificity if lane lines cannot be determine from initial thresholded binary
+* Improving upon smoothing algorithm
+ * Use concept of ["keyframing" from video compression](https://en.wikipedia.org/wiki/Key_frame#Video_compression) technology to periodically revert back to naive line detection, even if polynomial fit line detection has detected a line, in case it is tracking a bad line segment
+
  
