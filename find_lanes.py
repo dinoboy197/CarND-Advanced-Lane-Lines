@@ -351,9 +351,9 @@ def radius_of_curvature(height, left_fit_cr, right_fit_cr):
     """estimate radius of curvature based on chosen"""
     # Define y-value where we want radius of curvature
     left_curverad = (
-        (1 + (2 * left_fit_cr[0] * height + left_fit_cr[1]) ** 2) ** 1.5) / np.absolute(2 * left_fit_cr[0])
+        (1 + (2 * left_fit_cr[0] * height * ym_per_pix + left_fit_cr[1]) ** 2) ** 1.5) / np.absolute(2 * left_fit_cr[0])
     right_curverad = (
-        (1 + (2 * right_fit_cr[0] * height + right_fit_cr[1]) ** 2) ** 1.5) / np.absolute(2 * right_fit_cr[0])
+        (1 + (2 * right_fit_cr[0] * height * ym_per_pix + right_fit_cr[1]) ** 2) ** 1.5) / np.absolute(2 * right_fit_cr[0])
     return (left_curverad, right_curverad)
 
 
