@@ -2,9 +2,9 @@
 
 ## Overview
 
-A huge portion of the challenge in building a self-driving car is environment perception. Autonomous vehicles may use many different types of inputs to help them perceive their environment and make decisions about how to navigate. The field of computer vision includes techniques to allow the a self-driving car to perceive its environment simply by looking at inputs from cameras. Cameras have a much higher spatial resolution than radar and lidar, and while raw camera images themselves are two-dimensional, the higher resolution often allows them to infer the depth of objects in a scene. Plus, cameras are much less expensive than radar and lidar sensors, giving them a huge advantage in current self-driving car perception systems. In the future, it is even possible that self-driving cars will be outfitted simply with a suite of cameras and intelligent software to interpret the images, much like a human does with its two eyes and a brain.
+A huge portion of the challenge in building a self-driving car is environment perception. Autonomous vehicles may use many different types of inputs to help them perceive their environment and make decisions about how to navigate. The field of **computer vision** includes techniques to allow a self-driving car to perceive its environment simply by looking at inputs from cameras. Cameras have a much higher spatial resolution than radar and lidar, and while raw camera images themselves are two-dimensional, their higher resolution often allows for inference of the depth of objects in a scene. Plus, cameras are much less expensive than radar and lidar sensors, giving them a huge advantage in current self-driving car perception systems. In the future, it is even possible that self-driving cars will be outfitted simply with a suite of cameras and intelligent software to interpret the images, much like a human does with its two eyes and a brain.
 
-When operating on roadways, correctly identifying lane lines is critical for safe vehicle operation to prevent collisions with other vehicles, road boundaries, or other objects. While GPS measurements and other object detection inputs can help to localize a vehicle with high precision according to a pre-defined map, following lane lines painted on the road surface is still important; real life lane line boundaries will always take precidence over static map boundaries.
+When operating on roadways, correctly identifying lane lines is critical for safe vehicle operation to prevent collisions with other vehicles, road boundaries, or other objects. While GPS measurements and other object detection inputs can help to localize a vehicle with high precision according to a prefined map, following lane lines painted on the road surface is still important; real lane boundaries will always take precedence over static map boundaries.
 
 While [the previous lane line finding project](https://github.com/dinoboy197/CarND-LaneLines-P1.git) allowed for identification of lane lines under ideal conditions, this lane line detection pipeline can detect lane lines the face of challenges such as curving lanes, shadows, and pavement color changes. This pipeline also computes lane curvature and the location of the vehicle relative to the center of the lane, which informs path planning and eventually control systems (steering, throttle, brake, etc).
 
@@ -13,7 +13,7 @@ This repository contains a software pipeline which identifies lane boundaries in
 * Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
 * Apply a distortion correction to raw images.
 * Use color transforms, gradients, etc., to create a thresholded binary image.
-* Apply a perspective transform to rectify binary image ("birds-eye view").
+* Apply a perspective transform to rectify binary image ("bird's-eye view").
 * Detect lane pixels and fit to find the lane boundary.
 * Determine the curvature of the lane and vehicle position with respect to center.
 * Warp the detected lane boundaries back onto the original image.
@@ -48,11 +48,21 @@ Camera calibration images, test road images, and project videos are available in
 [polynomial_fit_limited]: ./examples/polynomial_fit_limited.png "Fit Visual"
 [final_lane]: ./examples/final_lane.png "Output"
 
+## Running code from this repository
+
+Running the code in this repository requires that the Udacity CarND Term1 Starter Kit to be properly installed. Click [here](https://github.com/udacity/CarND-Term1-Starter-Kit/blob/master/README.md) for the details.
+
+Once the starter kit is installed and activated, you may run:
+
+```sh
+sh find_lanes.py
+```
+
 ## Camera Calibration
 
-Cameras do not create perfect image representations of real life. Images are often distorted, especially around the edges of an image; edges can often get stretched or skewed. This is problematic for lane line finding as the curvature of a lane could easily be miscomputed simply due to distortion.
+Cameras do not create perfect image representations of real life. Images are often distorted, especially around the edges; edges can often get stretched or skewed. This is problematic for lane line finding as the curvature of a lane could easily be miscomputed simply due to distortion.
 
-The qualities of the distortion for a given camera can generally be represented as five constants, called collectively the "distortion coefficients". Once the coefficients of a given camera are computed, distortion in images produced can be reversed. To compute the distortion coefficients of a given camera, images of chessboard patterns as calibration images generated by the camera can be used. The OpenCV library has built-in methods to achieve this.
+The qualities of the distortion for a given camera can generally be represented as five constants, collectively called the "distortion coefficients". Once the coefficients of a given camera are computed, distortion in images produced can be reversed. To compute the distortion coefficients of a given camera, images of chessboard calibration patterns as calibration images can be used. The OpenCV library has built-in methods to achieve this.
 
 ### Computing the camera matrix and distortion coefficients
 
@@ -77,7 +87,7 @@ The distortion correction method `correct_distortion()` is used on a road image,
 
 ### Binary image thresholding
 
-Using the Sobel operator, a camera image can be transformed to reveal only strong lines that are likely to be lane lines. This has an advantage over Canny edge detection in that it ignores much of the gradient noise in an image which is not likely to be part of a lane line. Detected gradients can be filtered in both the horizontal and vertical directions using thresholds with different magnitudes to allow for much more precise detection of likely lane lines. Similarly, using different color channels in the gradient detection can help to increase the accuracy of lines selected.
+Using the [Sobel operator](https://en.wikipedia.org/wiki/Sobel_operator), a camera image can be transformed to reveal only strong lines that are likely to be lane lines. This has an advantage over [Canny edge detection](https://en.wikipedia.org/wiki/Canny_edge_detector) in that it ignores much of the gradient noise in an image which is not likely to be part of a lane line. Detected gradients can be filtered in both the horizontal and vertical directions using thresholds with different magnitudes to allow for much more precise detection of lane lines. Similarly, using different color channels in the gradient detection can help to increase the accuracy of lines selected.
 
 To create a thresholded binary image, I created a method called [`create_thresholded_binary()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L78-L113). This method detects horizontal line segments through a Sobel x gradient computation, white lines through a identifying high signal in the L channel of the LUV color space, and yellow lines through identifying low (yellow) signal in the B channel of the LAB color space. Any pixel identified by any of the three filters contributes to the binary image.
 
@@ -110,7 +120,7 @@ The effect of the perspective transform can be seen by viewing the pre and post-
 
 Once raw camera images have been distortion-corrected, gradient-thresholded, and perspective-transformed, the result is ready to have lane lines identified.
 
-I used two methods of identifying lane lines in a thresholded binary image and fitting with a polynomial. The first method identifies pixels by a naive sliding window detection algorithm; the second method identifies pixels by starting with a previous line fit as a starting point. Both methods use common code in [`fit_lane_line_polynomials()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L221-L272) to pick the method to use, and fall back to naive sliding window search if the previous line fit does not perform.
+I used two methods of identifying lane lines in a thresholded binary image and fitting with a polynomial. The first method identifies pixels by a naive sliding window detection algorithm; the second method identifies pixels by starting with a previous line fit. Both methods use common code in [`fit_lane_line_polynomials()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L221-L272) to pick the method to use, and fall back to naive sliding window search if the previous line fit does not perform.
 
 In the first method, [`fit_lane_line_polynomial()`](https://github.com/dinoboy197/CarND-Advanced-Lane-Lines/blob/master/find_lanes.py#L126-L180), the thresholded binary image is scanned on nine individual horizontal slices of the image. Slices start at the bottom and move up, selecting from the nearest to farthest point on the road. In each slice, a box starts at the horizontal location with the most highlighted pixels, and moves to the left or right at each step "up" the image based where most of the highlighted pixels in the box are detected, with some constraints on how far to the left or right the image can move and how big the windows are. Any pixels caught in each sliding window are used for a 2nd degree polynomial curve fit. This method is performed twice for each image, to attempt to capture both left and right lanes.
 
