@@ -55,7 +55,7 @@ Running the code in this repository requires that the Udacity CarND Term1 Starte
 Once the starter kit is installed and activated, you may run:
 
 ```sh
-sh find_lanes.py
+python find_lanes.py
 ```
 
 ## Camera Calibration
